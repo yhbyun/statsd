@@ -14,13 +14,22 @@ class StatsdServiceProvider extends ServiceProvider
 {
 
     /**
+     * Indicates if loading of the provider is deferred.
+     *
+     * @var bool
+     */
+    protected $defer = true;
+
+    /**
      * Boot the service provider.
      *
      * @return void
      */
     public function boot()
     {
-        $this->package('league/statsd', 'statsd');
+        $this->publishes([
+            __DIR__.'/../../config/config.php' => config_path('statsd.php'),
+        ], 'config');
     }
 
     /**
@@ -40,25 +49,32 @@ class StatsdServiceProvider extends ServiceProvider
      */
     protected function registerStatsD()
     {
-        $this->app['statsd'] = $this->app->share(
-            function ($app) {
-                // Set Default host and port
-                $options = array();
-                if (isset($app['config']['statsd.host'])) {
-                    $options['host'] = $app['config']['statsd.host'];
-                }
-                if (isset($app['config']['statsd.port'])) {
-                    $options['port'] = $app['config']['statsd.port'];
-                }
-                if (isset($app['config']['statsd.namespace'])) {
-                    $options['namespace'] = $app['config']['statsd.namespace'];
-                }
+        $app = $this->app;
 
-                // Create
+        // merge default config
+        $this->mergeConfigFrom(
+            __DIR__.'/../../config/config.php',
+            'statsd'
+        );
+
+        $app->singleton(
+            'statsd',
+            function ($app) {
                 $statsd = new Statsd();
-                $statsd->configure($options);
+                $statsd->configure($app['config']->get('statsd'));
+
                 return $statsd;
             }
         );
+    }
+
+    /**
+     * Get the services provided by the provider.
+     *
+     * @return array
+     */
+    public function provides()
+    {
+        return ['statsd'];
     }
 }
